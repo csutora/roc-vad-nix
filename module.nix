@@ -115,81 +115,84 @@ in
     config = lib.mkIf cfg.enable {
         environment.systemPackages = [ cfg.package ];
 
-        system.activationScripts.rocvad.text = ''
-            set -eu
+        system.activationScripts.postActivation.text = ''
+            (
+                set -eu
 
-            src=${cfg.package}/Library/Audio/Plug-Ins/HAL/roc_vad.driver
-            dst=/Library/Audio/Plug-Ins/HAL/roc_vad.driver
-            marker=/Library/Audio/Plug-Ins/HAL/.roc_vad.nixsrc
+                src=${cfg.package}/Library/Audio/Plug-Ins/HAL/roc_vad.driver
+                dst=/Library/Audio/Plug-Ins/HAL/roc_vad.driver
+                marker=/Library/Audio/Plug-Ins/HAL/.roc_vad.nixsrc
 
-            changed=0
-            if [ ! -e "$dst" ] || [ ! -f "$marker" ] || [ "$(cat "$marker" 2>/dev/null || true)" != "$src" ]; then
-                rm -rf "$dst"
-                mkdir -p /Library/Audio/Plug-Ins/HAL
-                cp -R "$src" "$dst"
-                chown -R root:wheel "$dst"
-                find "$dst" -type d -exec chmod 755 {} +
-                find "$dst" -type f -exec chmod 644 {} +
-                printf '%s' "$src" > "$marker"
-                changed=1
-            fi
-
-            if [ "$changed" = "1" ]; then
-                launchctl kickstart -k system/com.apple.audio.coreaudiod || true
-            fi
-        '' + lib.optionalString cfg.sender.enable ''
-
-            ready=0
-            attempt=0
-            while [ "$attempt" -lt 30 ]; do
-                if ${cfg.package}/bin/roc-vad info >/dev/null 2>&1; then
-                    ready=1
-                    break
-                fi
-                attempt=$((attempt + 1))
-                sleep 1
-            done
-
-            if [ "$ready" != "1" ]; then
-                echo "roc-vad: timed out waiting for grpc server on 127.0.0.1:9712; skipping sender device setup" >&2
-            else
-                mkdir -p /var/lib/roc-vad
-                spec_file=/var/lib/roc-vad/sender-spec.sha256
-                connect_file=/var/lib/roc-vad/sender-connect.sha256
-
-                spec_hash=${specHash}
-                connect_hash=${connectHash}
-                prev_spec=$(cat "$spec_file" 2>/dev/null || true)
-                prev_connect=$(cat "$connect_file" 2>/dev/null || true)
-
-                exists=0
-                if ${cfg.package}/bin/roc-vad device show -u ${lib.escapeShellArg managedUid} >/dev/null 2>&1; then
-                    exists=1
+                changed=0
+                if [ ! -e "$dst" ] || [ ! -f "$marker" ] || [ "$(cat "$marker" 2>/dev/null || true)" != "$src" ]; then
+                    rm -rf "$dst"
+                    mkdir -p /Library/Audio/Plug-Ins/HAL
+                    cp -R "$src" "$dst"
+                    chown -R root:wheel "$dst"
+                    find "$dst" -type d -exec chmod 755 {} +
+                    find "$dst" -type f -exec chmod 644 {} +
+                    printf '%s' "$src" > "$marker"
+                    changed=1
                 fi
 
-                if [ "$spec_hash" != "$prev_spec" ] || [ "$exists" = "0" ]; then
-                    if [ "$exists" = "1" ]; then
-                        ${cfg.package}/bin/roc-vad device del -u ${lib.escapeShellArg managedUid}
+                if [ "$changed" = "1" ]; then
+                    launchctl kickstart -k system/com.apple.audio.coreaudiod || true
+                fi
+            '' + lib.optionalString cfg.sender.enable ''
+
+                ready=0
+                attempt=0
+                while [ "$attempt" -lt 30 ]; do
+                    if ${cfg.package}/bin/roc-vad info >/dev/null 2>&1; then
+                        ready=1
+                        break
                     fi
-                    ${cfg.package}/bin/roc-vad device add sender \
-                        --uid ${lib.escapeShellArg managedUid} \
-                        --name ${lib.escapeShellArg s.name} \
-                        --fec-encoding ${lib.escapeShellArg s.fec} \
-                        ${mkFlag "--resampler-profile" s.resamplerProfile} \
-                        ${mkFlag "--latency-profile" s.latencyProfile} \
-                        ${mkFlag "--target-latency" s.targetLatency}
-                    printf '%s' "$spec_hash" > "$spec_file"
-                    rm -f "$connect_file"
-                    prev_connect=""
-                fi
+                    attempt=$((attempt + 1))
+                    sleep 1
+                done
 
-                if [ "$connect_hash" != "$prev_connect" ]; then
-                    ${cfg.package}/bin/roc-vad device connect -u ${lib.escapeShellArg managedUid} \
-                        --source ${lib.escapeShellArg sourceUri} ${lib.optionalString (repairUri != null) "--repair ${lib.escapeShellArg repairUri}"} \
-                        --control ${lib.escapeShellArg controlUri}
-                    printf '%s' "$connect_hash" > "$connect_file"
+                if [ "$ready" != "1" ]; then
+                    echo "roc-vad: timed out waiting for grpc server on 127.0.0.1:9712; skipping sender device setup" >&2
+                else
+                    mkdir -p /var/lib/roc-vad
+                    spec_file=/var/lib/roc-vad/sender-spec.sha256
+                    connect_file=/var/lib/roc-vad/sender-connect.sha256
+
+                    spec_hash=${specHash}
+                    connect_hash=${connectHash}
+                    prev_spec=$(cat "$spec_file" 2>/dev/null || true)
+                    prev_connect=$(cat "$connect_file" 2>/dev/null || true)
+
+                    exists=0
+                    if ${cfg.package}/bin/roc-vad device show -u ${lib.escapeShellArg managedUid} >/dev/null 2>&1; then
+                        exists=1
+                    fi
+
+                    if [ "$spec_hash" != "$prev_spec" ] || [ "$exists" = "0" ]; then
+                        if [ "$exists" = "1" ]; then
+                            ${cfg.package}/bin/roc-vad device del -u ${lib.escapeShellArg managedUid}
+                        fi
+                        ${cfg.package}/bin/roc-vad device add sender \
+                            --uid ${lib.escapeShellArg managedUid} \
+                            --name ${lib.escapeShellArg s.name} \
+                            --fec-encoding ${lib.escapeShellArg s.fec} \
+                            ${mkFlag "--resampler-profile" s.resamplerProfile} \
+                            ${mkFlag "--latency-profile" s.latencyProfile} \
+                            ${mkFlag "--target-latency" s.targetLatency}
+                        printf '%s' "$spec_hash" > "$spec_file"
+                        rm -f "$connect_file"
+                        prev_connect=""
+                    fi
+
+                    if [ "$connect_hash" != "$prev_connect" ]; then
+                        ${cfg.package}/bin/roc-vad device connect -u ${lib.escapeShellArg managedUid} \
+                            --source ${lib.escapeShellArg sourceUri} ${lib.optionalString (repairUri != null) "--repair ${lib.escapeShellArg repairUri}"} \
+                            --control ${lib.escapeShellArg controlUri}
+                        printf '%s' "$connect_hash" > "$connect_file"
+                    fi
                 fi
-            fi
+            '' + ''
+            ) || echo "[roc-vad] activation failed" >&2
         '';
     };
 }
