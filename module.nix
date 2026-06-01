@@ -119,6 +119,15 @@ in
             (
                 set -eu
 
+                echo "Activating roc-vad"
+
+                roc_vad() {
+                    if ! out=$("${cfg.package}/bin/roc-vad" "$@" 2>&1); then
+                        printf '%s\n' "$out" >&2
+                        return 1
+                    fi
+                }
+
                 src=${cfg.package}/Library/Audio/Plug-Ins/HAL/roc_vad.driver
                 dst=/Library/Audio/Plug-Ins/HAL/roc_vad.driver
                 marker=/Library/Audio/Plug-Ins/HAL/.roc_vad.nixsrc
@@ -169,9 +178,9 @@ in
 
                     if [ "$spec_hash" != "$prev_spec" ] || [ "$exists" = "0" ]; then
                         if [ "$exists" = "1" ]; then
-                            ${cfg.package}/bin/roc-vad device del -u ${lib.escapeShellArg managedUid}
+                            roc_vad device del -u ${lib.escapeShellArg managedUid}
                         fi
-                        ${cfg.package}/bin/roc-vad device add sender \
+                        roc_vad device add sender \
                             --uid ${lib.escapeShellArg managedUid} \
                             --name ${lib.escapeShellArg s.name} \
                             --fec-encoding ${lib.escapeShellArg s.fec} \
@@ -184,7 +193,7 @@ in
                     fi
 
                     if [ "$connect_hash" != "$prev_connect" ]; then
-                        ${cfg.package}/bin/roc-vad device connect -u ${lib.escapeShellArg managedUid} \
+                        roc_vad device connect -u ${lib.escapeShellArg managedUid} \
                             --source ${lib.escapeShellArg sourceUri} ${lib.optionalString (repairUri != null) "--repair ${lib.escapeShellArg repairUri}"} \
                             --control ${lib.escapeShellArg controlUri}
                         printf '%s' "$connect_hash" > "$connect_file"
