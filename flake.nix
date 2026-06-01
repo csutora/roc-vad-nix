@@ -38,7 +38,7 @@
                             rm -rf /Library/Audio/Plug-Ins/HAL/roc_vad.driver
                             rm -f /Library/Audio/Plug-Ins/HAL/.roc_vad.nixsrc
                             rm -rf /var/lib/roc-vad
-                            launchctl kickstart -k system/com.apple.audio.coreaudiod || true
+                            killall -9 coreaudiod 2>/dev/null || true
                         '';
                     }
                 ];

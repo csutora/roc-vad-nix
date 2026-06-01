@@ -136,7 +136,8 @@ in
                 fi
 
                 if [ "$changed" = "1" ]; then
-                    launchctl kickstart -k system/com.apple.audio.coreaudiod || true
+                    killall -9 coreaudiod 2>/dev/null || true
+                    sleep 2
                 fi
             '' + lib.optionalString cfg.sender.enable ''
 
