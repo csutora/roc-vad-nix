@@ -127,10 +127,8 @@ in
                 if [ ! -e "$dst" ] || [ ! -f "$marker" ] || [ "$(cat "$marker" 2>/dev/null || true)" != "$src" ]; then
                     rm -rf "$dst"
                     mkdir -p /Library/Audio/Plug-Ins/HAL
-                    cp -R "$src" "$dst"
+                    cp -pR "$src" "$dst"
                     chown -R root:wheel "$dst"
-                    find "$dst" -type d -exec chmod 755 {} +
-                    find "$dst" -type f -exec chmod 644 {} +
                     printf '%s' "$src" > "$marker"
                     changed=1
                 fi
