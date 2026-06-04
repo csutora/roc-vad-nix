@@ -24,6 +24,7 @@ let
 
     specStr = lib.concatStringsSep "|" (map optStr [
         s.name
+        (toString s.deviceRate)
         s.fec
         s.resamplerProfile
         s.latencyProfile
@@ -89,6 +90,17 @@ in
                 type = lib.types.enum [ "disable" "default" "rs8m" "ldpc" ];
                 default = "rs8m";
                 description = "fec encoding. must match the receiver's fec setting.";
+            };
+
+            deviceRate = lib.mkOption {
+                type = lib.types.ints.positive;
+                default = 48000;
+                example = 48000;
+                description = ''
+                    sample rate the virtual device exposes to coreaudio, in hertz.
+                    defaults to 48000 to match macos' typical mixer rate. set to
+                    match your receiver's rate to avoid resampling on both ends.
+                '';
             };
 
             resamplerProfile = lib.mkOption {
@@ -183,6 +195,7 @@ in
                         roc_vad device add sender \
                             --uid ${lib.escapeShellArg managedUid} \
                             --name ${lib.escapeShellArg s.name} \
+                            --device-rate ${toString s.deviceRate} \
                             --fec-encoding ${lib.escapeShellArg s.fec} \
                             ${mkFlag "--resampler-profile" s.resamplerProfile} \
                             ${mkFlag "--latency-profile" s.latencyProfile} \
